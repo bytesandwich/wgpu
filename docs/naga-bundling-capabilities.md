@@ -203,8 +203,54 @@ naga shader.wgsl output.metal  # Metal
 naga shader.wgsl output.hlsl  # HLSL
 ```
 
+## Potential Native Implementation
+
+Adding native import/export and linking to naga is technically feasible but would be a significant undertaking. Here's how it could be approached:
+
+### 1. Import/Export Pass (Pre-parse or AST level)
+
+New directive handling would be added in `naga/src/front/wgsl/parse/directive/`:
+```wgsl
+export fn myFunction() { ... }
+import "module_path" { myFunction, MyType }
+```
+
+This would:
+- Extend the lexer/parser to recognize `import`/`export` keywords
+- Track exported symbols in a new `ExportTable` structure
+- Track import references as unresolved dependencies
+
+### 2. Linking Pass (IR level)
+
+A new `naga/src/link/mod.rs` module would:
+- Take multiple `naga::Module` instances
+- Remap all `Handle<T>` references when merging arenas (types, constants, functions, etc.)
+- Resolve cross-module references using a symbol table
+- Deduplicate equivalent types using `UniqueArena`
+- Validate no circular dependencies exist
+
+The trickiest part is handle remapping—naga's arena-based IR uses `Handle<T>` extensively, and merging modules requires translating all handles from source module arenas to the combined module.
+
+### 3. Source Mapping
+
+Naga already has `Span` infrastructure (`naga/src/span.rs`) that tracks byte offsets. To extend this:
+- Add a `SourceMap` type mapping `Span → (file_path, original_span)`
+- Modify parsing to accept file identifiers
+- Preserve mappings through lowering and IR transformations
+- Output source maps in a standard format (e.g., similar to JavaScript source maps)
+
+### Effort Estimate
+
+- **Import/Export syntax**: ~2-3 weeks (parser changes, AST extensions)
+- **Linking pass**: ~4-6 weeks (handle remapping, type deduplication, validation)
+- **Source mapping**: ~2-3 weeks (span tracking through all passes)
+
+### Alternative: Expose Parser API
+
+A lighter approach (as discussed in [#6250](https://github.com/gfx-rs/wgpu/issues/6250)) would be exposing naga's lexer/parser as a public API, letting tools like naga_oil handle composition at the source level before naga parsing.
+
 ## Conclusion
 
 Naga is designed as a shader translation library, not a build system or module bundler. For module composition needs, external tools like naga_oil provide the necessary functionality. The WGSL specification itself does not include imports, and naga faithfully implements this specification while providing extension points for wgpu-specific features.
 
-Future developments in WESL may provide standardized import syntax, but for now, projects requiring shader modularity should use naga_oil or implement custom preprocessing solutions.
+Future developments in WESL may provide standardized import syntax, but for now, projects requiring shader modularity should use naga_oil or implement custom preprocessing solutions. Native import/export/linking support could be added to naga with significant engineering effort, primarily around handle remapping and source map preservation.
