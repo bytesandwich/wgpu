@@ -12,12 +12,15 @@ This document summarizes the current state of naga's support for shader modulari
 
 Naga's IR is organized around the `Module` struct (`naga/src/ir/mod.rs`), which contains:
 - `types`: Arena of type definitions
+- `special_types`: Dictionary of special type handles (e.g., ray query types)
 - `constants`: Arena of constant values
 - `overrides`: Arena of pipeline-overridable constants
 - `global_variables`: Arena of global variables
 - `global_expressions`: Arena of constant/override expressions
 - `functions`: Arena of function definitions
 - `entry_points`: Vector of entry point definitions
+- `diagnostic_filters`: Arena for diagnostic filter rules
+- `doc_comments`: Optional documentation comments
 
 Each module is a self-contained compilation unit with no built-in mechanism for referencing or importing from other modules.
 
@@ -133,7 +136,7 @@ let mut combined = Module::default();
 
 ### Module Compaction
 
-Naga provides compaction (`naga::compact::compact()`) which:
+Naga provides compaction via the `compact` function in `naga::compact` which:
 - Removes unused declarations
 - Can filter to a specific entry point
 - Useful for dead code elimination after manual merging
